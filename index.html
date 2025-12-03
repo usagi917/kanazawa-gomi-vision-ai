@@ -3,11 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>金沢市ごみ分別AI</title>
+    <title>金沢市オープンデータチャット</title>
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
     
     <style>
         /* --- デザイン変数 --- */
@@ -19,150 +20,182 @@
             --text-sub: #8b8b93;
             --accent: #00f2ff;
             --accent-grad: linear-gradient(135deg, #00f2ff 0%, #0061ff 100%);
-            --warning: #ffcc00; /* 案内用 */
-            --font-main: 'Inter', sans-serif;
+            --user-bubble: linear-gradient(135deg, rgba(0, 242, 255, 0.2) 0%, rgba(0, 97, 255, 0.2) 100%);
             --font-jp: 'Noto Sans JP', sans-serif;
+            --header-height: 60px;
+            --input-height: 70px;
         }
 
         /* --- 基本設定 --- */
         * { box-sizing: border-box; outline: none; -webkit-tap-highlight-color: transparent; }
         body {
-            margin: 0; padding: 0;
-            font-family: var(--font-jp);
-            background-color: var(--bg-color);
-            color: var(--text-main);
-            min-height: 100vh;
-            display: flex; justify-content: center; align-items: center;
+            margin: 0; padding: 0; font-family: var(--font-jp); background-color: var(--bg-color);
+            color: var(--text-main); height: 100vh; overflow: hidden; /* スクロールはチャットエリア内で行う */
         }
 
         /* --- 背景エフェクト --- */
         .bg-orb {
-            position: fixed; border-radius: 50%; filter: blur(80px); z-index: -1; opacity: 0.6;
-            animation: orbFloat 10s infinite alternate ease-in-out;
+            position: fixed; border-radius: 50%; filter: blur(80px); z-index: -1; opacity: 0.4;
+            animation: orbFloat 15s infinite alternate ease-in-out; pointer-events: none;
         }
-        .orb-1 { width: 400px; height: 400px; background: #0061ff; top: -100px; left: -100px; }
-        .orb-2 { width: 300px; height: 300px; background: #00f2ff; bottom: -50px; right: -50px; animation-delay: -5s; }
-        @keyframes orbFloat { 0% { transform: translate(0, 0) scale(1); } 100% { transform: translate(30px, 50px) scale(1.1); } }
+        .orb-1 { width: 500px; height: 500px; background: #0061ff; top: -10%; left: -10%; }
+        .orb-2 { width: 400px; height: 400px; background: #00f2ff; bottom: -10%; right: -10%; animation-delay: -5s; }
+        @keyframes orbFloat { 0% { transform: translate(0, 0) scale(1); } 100% { transform: translate(40px, 60px) scale(1.1); } }
 
-        /* --- コンテナ --- */
-        .app-container { width: 100%; max-width: 480px; padding: 24px; position: relative; z-index: 1; }
+        /* --- メインレイアウト --- */
+        .app-container {
+            display: flex; flex-direction: column; height: 100%; max-width: 600px; margin: 0 auto;
+            background: rgba(255,255,255,0.02); backdrop-filter: blur(10px);
+        }
 
         /* --- ヘッダー --- */
-        header { margin-bottom: 30px; text-align: center; }
-        h1 {
-            font-family: var(--font-jp); font-weight: 800; font-size: 2rem; margin: 0;
-            background: var(--accent-grad); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
-            text-shadow: 0 10px 30px rgba(0, 242, 255, 0.3);
+        .chat-header {
+            height: var(--header-height); padding: 0 20px;
+            display: flex; align-items: center; justify-content: space-between;
+            border-bottom: 1px solid var(--glass-border); background: rgba(15, 15, 19, 0.8);
+            z-index: 10;
         }
-        .subtitle { font-size: 0.85rem; color: var(--text-sub); margin-top: 8px; letter-spacing: 0.05em; }
+        .header-title {
+            font-weight: 800; font-size: 1.1rem;
+            background: var(--accent-grad); 
+            -webkit-background-clip: text; background-clip: text;
+            -webkit-text-fill-color: transparent; color: transparent;
+        }
 
-        /* --- カードスタイル --- */
-        .glass-card {
+        /* 地域設定バー */
+        .settings-bar {
+            padding: 10px 20px; background: rgba(0,0,0,0.3); border-bottom: 1px solid var(--glass-border);
+            display: flex; align-items: center; gap: 10px; font-size: 0.85rem; color: var(--text-sub);
+        }
+        .settings-icon { font-size: 1.2rem; color: var(--accent); }
+        .town-select {
+            flex-grow: 1; background: transparent; border: none; color: var(--text-main);
+            font-family: var(--font-jp); font-size: 0.9rem; cursor: pointer;
+        }
+        .town-select option { background: #222; }
+
+
+        /* --- チャットエリア (タイムライン) --- */
+        .chat-history {
+            flex-grow: 1; overflow-y: auto; padding: 20px;
+            display: flex; flex-direction: column; gap: 20px;
+            scroll-behavior: smooth;
+        }
+        /* スクロールバー非表示 */
+        .chat-history::-webkit-scrollbar { display: none; }
+
+        /* メッセージバブル共通 */
+        .message { display: flex; flex-direction: column; max-width: 85%; animation: fadeUp 0.3s ease forwards; }
+        .message-content {
+            padding: 14px 18px; border-radius: 20px; position: relative;
+            backdrop-filter: blur(10px); border: 1px solid var(--glass-border);
+            font-size: 0.95rem; line-height: 1.5; word-break: break-word;
+        }
+        
+        /* ユーザーのメッセージ (右側) */
+        .message.user { align-self: flex-end; align-items: flex-end; }
+        .message.user .message-content {
+            background: var(--user-bubble);
+            border-color: rgba(0, 242, 255, 0.3);
+            border-bottom-right-radius: 4px;
+        }
+        .user-image-preview {
+            max-width: 200px; max-height: 200px; border-radius: 12px; margin-bottom: 8px;
+            border: 2px solid rgba(0, 242, 255, 0.3);
+        }
+
+        /* AIのメッセージ (左側) */
+        .message.ai { align-self: flex-start; }
+        .message.ai .message-content {
             background: var(--glass-bg);
-            backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
-            border: 1px solid var(--glass-border);
-            border-radius: 24px; padding: 24px; margin-bottom: 20px;
-            transition: transform 0.3s ease;
+            border-bottom-left-radius: 4px;
         }
+        .ai-avatar {
+            width: 32px; height: 32px; border-radius: 50%; background: var(--accent-grad);
+            display: flex; align-items: center; justify-content: center; font-size: 18px; margin-bottom: 6px;
+            box-shadow: 0 4px 10px rgba(0, 242, 255, 0.3);
+        }
+
+        /* --- AI応答のリッチコンテンツ --- */
+        .rich-result-name { font-size: 1.2rem; font-weight: 700; margin: 8px 0; }
+        .rich-badge {
+            display: inline-block; padding: 4px 12px; border-radius: 30px;
+            font-size: 0.75rem; font-weight: 600;
+            background: rgba(0, 242, 255, 0.1); border: 1px solid var(--accent); color: var(--accent);
+        }
+        .rich-date-card {
+            background: rgba(0,0,0,0.2); border-radius: 12px; padding: 12px;
+            margin-top: 12px; display: flex; align-items: center; gap: 10px;
+        }
+        .rich-date-icon { font-size: 1.2rem; }
+        .rich-date-text { font-size: 0.9rem; font-weight: bold; }
+        .rich-note { margin-top: 10px; font-size: 0.85rem; color: #ff8fa3; display: flex; gap: 6px; }
+        .rich-suggestion {
+             margin-top: 12px; padding: 10px; background: rgba(255, 204, 0, 0.1);
+             border-radius: 8px; font-size: 0.85rem; color: #ffcc00; display: flex; align-items: center; gap: 8px;
+             cursor: pointer;
+        }
+
+        /* --- 入力エリア (フッター) --- */
+        .chat-input-area {
+            height: var(--input-height); padding: 10px 20px;
+            background: rgba(15, 15, 19, 0.9); border-top: 1px solid var(--glass-border);
+            display: flex; align-items: center; gap: 12px; z-index: 10;
+        }
+        .input-wrapper {
+            flex-grow: 1; position: relative; display: flex; align-items: center;
+            background: rgba(255,255,255,0.05); border-radius: 24px;
+            border: 1px solid var(--glass-border); transition: 0.3s;
+        }
+        .input-wrapper:focus-within { border-color: var(--accent); background: rgba(0, 242, 255, 0.05); }
         
-        label { display: block; font-size: 0.75rem; color: var(--text-sub); margin-bottom: 12px; font-weight: 600; }
-        label span { font-family: var(--font-jp); font-weight: 700; margin-left: 8px; font-size: 0.85rem; color: #fff; }
-        .optional-tag { 
-            background: rgba(255,255,255,0.1); padding: 2px 8px; border-radius: 10px; 
-            font-size: 0.7rem; margin-left: 8px; color: var(--text-sub); vertical-align: middle;
+        /* テキスト入力 (将来用) */
+        .chat-text-input {
+            flex-grow: 1; background: transparent; border: none; padding: 12px 16px;
+            color: var(--text-main); font-family: var(--font-jp); font-size: 1rem;
         }
+        .chat-text-input::placeholder { color: rgba(255,255,255,0.3); }
 
-        /* --- フォーム --- */
-        .custom-select-wrapper { position: relative; }
-        select {
-            width: 100%; background: rgba(0,0,0,0.2); color: white;
-            border: 1px solid var(--glass-border); padding: 16px; border-radius: 12px;
-            font-size: 1rem; font-family: var(--font-jp); appearance: none; cursor: pointer;
+        /* 画像アップロードボタン */
+        .upload-btn-icon {
+            padding: 10px; color: var(--text-sub); cursor: pointer; transition: 0.2s;
         }
-        .select-arrow { position: absolute; right: 16px; top: 50%; transform: translateY(-50%); pointer-events: none; color: var(--text-sub); font-size: 0.8rem; }
-
-        /* --- アップロード --- */
-        .upload-zone {
-            position: relative; border: 2px dashed var(--glass-border); border-radius: 16px;
-            padding: 40px 20px; text-align: center; cursor: pointer; background: rgba(0,0,0,0.1); overflow: hidden;
-        }
-        .upload-zone.active { border-color: var(--accent); background: rgba(0, 242, 255, 0.05); }
-        .upload-icon { font-size: 2rem; margin-bottom: 12px; display: block; }
-        .upload-text { font-size: 0.9rem; color: var(--text-sub); font-weight: 500; }
-        #preview { width: 100%; height: 100%; object-fit: cover; position: absolute; top: 0; left: 0; display: none; border-radius: 14px; }
-        .reset-upload {
-            position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.6); color: white;
-            border-radius: 50%; width: 30px; height: 30px; display: none; align-items: center; justify-content: center;
-            z-index: 10; font-size: 14px; cursor: pointer;
-        }
-
-        /* --- ボタン --- */
-        .main-btn {
-            width: 100%; padding: 18px; border: none; border-radius: 16px;
-            background: var(--accent-grad); color: #000; font-family: var(--font-jp);
-            font-weight: 800; font-size: 1rem; cursor: pointer; transition: 0.3s;
-        }
-        .main-btn:disabled { background: #333; color: #666; cursor: not-allowed; opacity: 0.5; }
-
-        /* --- 結果表示 --- */
-        #resultArea { display: none; margin-top: 30px; }
-        .result-header { font-size: 0.8rem; color: var(--text-sub); margin-bottom: 8px; font-weight: bold; }
-        .result-name {
-            font-size: 2rem; font-weight: 700; margin-bottom: 16px; line-height: 1.2;
-            background: linear-gradient(to right, #fff, #ddd); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
-        }
-        .badge {
-            display: inline-flex; align-items: center; padding: 6px 14px; border-radius: 30px;
-            font-size: 0.85rem; font-weight: 600; margin-bottom: 24px;
-            background: rgba(0, 242, 255, 0.15); border: 1px solid var(--accent); color: var(--accent);
-        }
-
-        /* 日付カード (通常時) */
-        .date-card {
-            background: rgba(255,255,255,0.03); border-radius: 16px; padding: 20px;
-            display: flex; align-items: center; gap: 15px;
-        }
-        .date-icon { font-size: 1.5rem; background: #222; padding: 10px; border-radius: 12px; }
-        .date-info h4 { margin: 0 0 4px 0; font-size: 0.75rem; color: var(--text-sub); }
-        .date-info p { margin: 0; font-size: 1.1rem; font-weight: 700; color: white; }
-
-        /* 案内カード (地域未選択時) */
-        .suggestion-card {
-            background: rgba(255, 204, 0, 0.1); border: 1px solid rgba(255, 204, 0, 0.3);
-            border-radius: 16px; padding: 16px; display: flex; align-items: center; gap: 12px;
-            cursor: pointer; transition: 0.2s;
-        }
-        .suggestion-card:active { transform: scale(0.98); }
-        .suggestion-icon { font-size: 1.5rem; }
-        .suggestion-text { font-size: 0.85rem; color: var(--warning); font-weight: 600; line-height: 1.4; }
-
-        /* 注意書き */
-        .note-box {
-            margin-top: 16px; padding: 16px; border-radius: 12px;
-            background: rgba(255, 71, 87, 0.1); border: 1px solid rgba(255, 71, 87, 0.3);
-            color: #ff8fa3; font-size: 0.9rem; display: flex; gap: 10px;
-        }
-
-        /* --- ローディング --- */
-        .loader-overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.8); backdrop-filter: blur(10px); z-index: 100;
-            display: none; flex-direction: column; justify-content: center; align-items: center;
-        }
-        .spinner {
-            width: 60px; height: 60px; border: 3px solid transparent; border-top-color: var(--accent);
-            border-radius: 50%; animation: spin 1s linear infinite;
-        }
-        .spinner::before {
-            content: ''; position: absolute; top: 5px; left: 5px; right: 5px; bottom: 5px;
-            border: 3px solid transparent; border-top-color: #0061ff; border-radius: 50%;
-            animation: spin 2s linear infinite;
-        }
-        .loading-text { margin-top: 20px; font-weight: bold; font-size: 0.9rem; letter-spacing: 0.1em; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .upload-btn-icon:hover { color: var(--accent); }
+        .upload-btn-icon.active { color: var(--accent); text-shadow: 0 0 10px var(--accent); }
         
-        .fade-in { animation: fadeIn 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards; opacity: 0; transform: translateY(20px); }
-        @keyframes fadeIn { to { opacity: 1; transform: translateY(0); } }
+        /* 送信ボタン */
+        .send-btn {
+            width: 48px; height: 48px; border: none; border-radius: 50%;
+            background: var(--accent-grad); color: #000;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; transition: 0.3s; flex-shrink: 0;
+        }
+        .send-btn:disabled { background: #333; color: #666; cursor: not-allowed; opacity: 0.5; }
+        .send-btn:not(:disabled):hover { transform: scale(1.05); box-shadow: 0 0 20px rgba(0, 242, 255, 0.4); }
+        .material-icons-round { font-size: 24px; }
+
+        /* サムネイル表示（入力欄上部） */
+        .thumbnail-area {
+            position: absolute; bottom: var(--input-height); left: 20px; z-index: 5;
+            background: rgba(15, 15, 19, 0.8); padding: 8px; border-radius: 12px 12px 0 0;
+            border: 1px solid var(--glass-border); border-bottom: none;
+            display: none; /* JSで表示制御 */
+        }
+        .thumb-wrapper { position: relative; width: 60px; height: 60px; }
+        .thumb-img { width: 100%; height: 100%; object-fit: cover; border-radius: 8px; border: 2px solid var(--accent); }
+        .thumb-close {
+            position: absolute; top: -8px; right: -8px; width: 20px; height: 20px;
+            background: #ff4757; color: white; border-radius: 50%; font-size: 14px;
+            display: flex; align-items: center; justify-content: center; cursor: pointer;
+        }
+
+        /* --- アニメーション --- */
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        .thinking-dots { display: flex; gap: 4px; padding: 6px 0; }
+        .dot { width: 8px; height: 8px; background: var(--accent); border-radius: 50%; animation: pulse 1.4s infinite ease-in-out both; }
+        .dot:nth-child(1) { animation-delay: -0.32s; }
+        .dot:nth-child(2) { animation-delay: -0.16s; }
+        @keyframes pulse { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1.0); } }
 
     </style>
 </head>
@@ -171,67 +204,45 @@
     <div class="bg-orb orb-1"></div>
     <div class="bg-orb orb-2"></div>
 
-    <div class="loader-overlay" id="loading">
-        <div class="spinner"></div>
-        <div class="loading-text">AI解析中...</div>
-    </div>
-
     <div class="app-container">
-        <header class="fade-in" style="animation-delay: 0.1s;">
-            <h1>金沢市ごみ分別AI</h1>
-            <div class="subtitle">写真を撮るだけで分別をお知らせ</div>
+        <header class="chat-header">
+            <div class="header-title">金沢市オープンデータチャット AI</div>
         </header>
 
-        <div class="glass-card fade-in" style="animation-delay: 0.2s;">
-            <label>01. <span>地域を選択</span> <span class="optional-tag">スキップ可</span></label>
-            <div class="custom-select-wrapper">
-                <select id="townSelect" disabled>
-                    <option value="">未選択（分別のみ判定）</option>
-                </select>
-                <div class="select-arrow">▼</div>
+        <div class="settings-bar">
+            <span class="material-icons-round settings-icon">location_on</span>
+            <select id="townSelect" class="town-select" disabled>
+                <option value="">地域を選択 (ゴミ収集日用)</option>
+            </select>
+        </div>
+
+        <div class="chat-history" id="chatHistory">
+            <div class="message ai">
+                <div class="ai-avatar">🤖</div>
+                <div class="message-content">
+                    こんにちは！金沢市のオープンデータAIです。<br>
+                    現在は「ごみの写真」を送ると分別方法をお答えします。
+                    <div style="margin-top: 10px; font-size: 0.85rem; color: var(--text-sub);">※将来的に色々なデータに対応予定です！</div>
+                </div>
             </div>
         </div>
 
-        <div class="glass-card fade-in" style="animation-delay: 0.3s;">
-            <label>02. <span>ゴミの写真を撮影</span></label>
-            <div class="upload-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
-                <div class="reset-upload" id="resetUpload" onclick="event.stopPropagation(); resetImage();">✕</div>
-                <img id="preview">
-                <div id="uploadPlaceholder">
-                    <span class="upload-icon">📷</span>
-                    <div class="upload-text">タップして撮影または選択</div>
-                </div>
+        <div class="thumbnail-area" id="thumbnailArea">
+            <div class="thumb-wrapper">
+                <img id="thumbImg" class="thumb-img">
+                <div class="thumb-close" onclick="resetImage()">✕</div>
+            </div>
+        </div>
+
+        <div class="chat-input-area">
+            <div class="input-wrapper">
+                <span class="material-icons-round upload-btn-icon" id="uploadIcon" onclick="document.getElementById('fileInput').click()">add_photo_alternate</span>
+                <input type="text" class="chat-text-input" placeholder="写真を送信してください..." disabled style="cursor: not-allowed;">
                 <input type="file" id="fileInput" accept="image/*" style="display: none">
             </div>
-        </div>
-
-        <button id="analyzeBtn" class="main-btn fade-in" style="animation-delay: 0.4s;" disabled>
-            写真をセットしてください
-        </button>
-
-        <div id="resultArea" class="glass-card fade-in">
-            <div class="result-header">判定結果</div>
-            <div class="result-name" id="resName">---</div>
-            <div><span class="badge" id="resType">---</span></div>
-
-            <div id="dateArea" class="date-card" style="display:none;">
-                <div class="date-icon">📅</div>
-                <div class="date-info">
-                    <h4>次の収集日</h4>
-                    <p id="resDate">---</p>
-                </div>
-            </div>
-
-            <div id="suggestionArea" class="suggestion-card" style="display:none;" onclick="scrollToTop()">
-                <div class="suggestion-icon">💡</div>
-                <div class="suggestion-text">
-                    地域を設定すると<br>「収集日」も表示されます ⤴
-                </div>
-            </div>
-
-            <div class="note-box" id="resNote" style="display:none">
-                <span>⚠️</span> <span id="resNoteText"></span>
-            </div>
+            <button id="sendBtn" class="send-btn" disabled>
+                <span class="material-icons-round">send</span>
+            </button>
         </div>
     </div>
 
@@ -245,16 +256,17 @@ const GAS_API_URL = "https://script.google.com/macros/s/AKfycbwOcWqaekKdQ6ZiluaF
 let APP_DATA = { dictionary: [], calendar: [] };
 let currentFileBase64 = null;
 let currentMimeType = null;
+const chatHistory = document.getElementById('chatHistory');
 
 window.onload = async () => {
     try {
+        // データロード
         const res = await fetch(GAS_API_URL);
-        const json = await res.json();
-        APP_DATA = json;
+        APP_DATA = await res.json();
         
+        // 地域選択肢生成
         const select = document.getElementById('townSelect');
-        // 初期選択肢
-        select.innerHTML = '<option value="">未選択（分別のみ判定）</option>';
+        select.innerHTML = '<option value="">地域を選択 (ゴミ収集日用)</option>';
         APP_DATA.calendar.forEach(c => {
             const opt = document.createElement('option');
             opt.value = c.area;
@@ -263,14 +275,14 @@ window.onload = async () => {
         });
         select.disabled = false;
 
-        // ローカルストレージから地域復元
+        // ローカルストレージ復元
         const savedTown = localStorage.getItem('kanazawa_trash_town');
         if (savedTown && APP_DATA.calendar.some(c => c.area === savedTown)) {
             select.value = savedTown;
         }
 
     } catch (e) {
-        alert("通信エラー: データを読み込めませんでした。");
+        addSystemMessage("⚠️ データの読み込みに失敗しました。通信環境を確認してください。");
     }
     
     // イベントリスナー
@@ -278,25 +290,26 @@ window.onload = async () => {
         const val = e.target.value;
         if(val) localStorage.setItem('kanazawa_trash_town', val);
         else localStorage.removeItem('kanazawa_trash_town');
-        checkState(); // ボタン等の更新は不要だが念のため
     });
 
     document.getElementById('fileInput').addEventListener('change', handleFile);
-    document.getElementById('analyzeBtn').addEventListener('click', runAnalysis);
+    document.getElementById('sendBtn').addEventListener('click', sendMessage);
 };
 
+// --- ファイルハンドリング ---
 function handleFile(e) {
     const file = e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
     reader.onloadend = () => {
-        document.getElementById('preview').src = reader.result;
-        document.getElementById('preview').style.display = 'block';
-        document.getElementById('uploadPlaceholder').style.display = 'none';
-        document.getElementById('resetUpload').style.display = 'flex';
-        
         currentMimeType = file.type;
         currentFileBase64 = reader.result.split(',')[1];
+        
+        // サムネイル表示
+        document.getElementById('thumbImg').src = reader.result;
+        document.getElementById('thumbnailArea').style.display = 'block';
+        document.getElementById('uploadIcon').classList.add('active');
+        
         checkState();
     };
     reader.readAsDataURL(file);
@@ -304,111 +317,165 @@ function handleFile(e) {
 
 function resetImage() {
     document.getElementById('fileInput').value = '';
-    document.getElementById('preview').style.display = 'none';
-    document.getElementById('uploadPlaceholder').style.display = 'block';
-    document.getElementById('resetUpload').style.display = 'none';
+    document.getElementById('thumbnailArea').style.display = 'none';
+    document.getElementById('uploadIcon').classList.remove('active');
     currentFileBase64 = null;
+    currentMimeType = null;
     checkState();
 }
 
 function checkState() {
-    const btn = document.getElementById('analyzeBtn');
-    // 写真さえあればOK（地域は必須ではない）
-    if (currentFileBase64) {
-        btn.disabled = false;
-        btn.innerText = "AIで判定する";
-    } else {
-        btn.disabled = true;
-        btn.innerText = "写真をセットしてください";
-    }
+    // 現時点では画像がある場合のみ送信可能
+    document.getElementById('sendBtn').disabled = !currentFileBase64;
 }
 
-function scrollToTop() {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-    // 少し目立たせる
-    const select = document.getElementById('townSelect');
-    select.focus();
-    select.style.borderColor = "#00f2ff";
-    setTimeout(() => select.style.borderColor = "", 1000);
-}
+// --- チャットコア機能 ---
 
-async function runAnalysis() {
-    const ui = {
-        res: document.getElementById('resultArea'),
-        load: document.getElementById('loading'),
-        dateArea: document.getElementById('dateArea'),
-        suggArea: document.getElementById('suggestionArea')
-    };
+async function sendMessage() {
+    if (!currentFileBase64) return;
+
+    // 1. ユーザーメッセージを表示
+    addUserMessage(document.getElementById('thumbImg').src);
     
-    ui.res.style.display = 'none';
-    ui.load.style.display = 'flex';
+    // UIリセット
+    const base64ToSend = currentFileBase64;
+    const mimeToSend = currentMimeType;
+    resetImage();
+    document.getElementById('sendBtn').disabled = true;
+
+    // 2. AI思考中表示
+    const thinkingBubble = addThinkingBubble();
 
     try {
+        // 3. API送信
         const res = await fetch(GAS_API_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-            body: JSON.stringify({ image: currentFileBase64, mimeType: currentMimeType })
+            body: JSON.stringify({ image: base64ToSend, mimeType: mimeToSend })
         });
         
         const result = await res.json();
         if (result.error) throw new Error(result.error);
         
-        // 辞書マッチング
-        const match = APP_DATA.dictionary.find(d => d.name === result.item_name) || 
-                      APP_DATA.dictionary.find(d => result.item_name.includes(d.name));
-        
-        if (match) {
-            document.getElementById('resName').innerText = match.name;
-            document.getElementById('resType').innerText = match.type;
-            
-            // ★ここが分岐ポイント
-            const town = document.getElementById('townSelect').value;
-            
-            if (town) {
-                // 地域あり -> 日付計算して表示
-                ui.dateArea.style.display = 'flex';
-                ui.suggArea.style.display = 'none';
-                
-                const area = APP_DATA.calendar.find(c => c.area === town);
-                let rule = "カレンダー確認";
-                if(area) {
-                    if (match.type.includes("燃やす")) rule = area.rules.burn;
-                    else if (match.type.includes("燃やさない")) rule = area.rules.nonburn;
-                    else rule = area.rules.resource;
-                }
-                document.getElementById('resDate').innerText = rule;
-
-            } else {
-                // 地域なし -> 案内を表示
-                ui.dateArea.style.display = 'none';
-                ui.suggArea.style.display = 'flex';
-            }
-
-            // 注意書き
-            const noteEl = document.getElementById('resNote');
-            if (match.note) {
-                document.getElementById('resNoteText').innerText = match.note;
-                noteEl.style.display = 'flex';
-            } else {
-                noteEl.style.display = 'none';
-            }
-        } else {
-            // 見つからない場合
-            document.getElementById('resName').innerText = result.item_name;
-            document.getElementById('resType').innerText = "登録なし";
-            ui.dateArea.style.display = 'none';
-            ui.suggArea.style.display = 'none';
-            document.getElementById('resNote').style.display = 'none';
-        }
-        
-        ui.res.style.display = 'block';
-        ui.res.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        // 4. 結果を生成して表示
+        thinkingBubble.remove();
+        addAiTrashResult(result);
 
     } catch (e) {
-        alert("エラー: " + e.message);
-    } finally {
-        ui.load.style.display = 'none';
+        thinkingBubble.remove();
+        addSystemMessage("❌ エラーが発生しました: " + e.message);
     }
+}
+
+// --- メッセージ表示系ヘルパー ---
+
+function scrollToBottom() {
+    chatHistory.scrollTop = chatHistory.scrollHeight;
+}
+
+function addUserMessage(imgSrc) {
+    const msgDiv = document.createElement('div');
+    msgDiv.className = 'message user';
+    msgDiv.innerHTML = `
+        <img src="${imgSrc}" class="user-image-preview">
+        <div class="message-content">このゴミの分別を教えてください。</div>
+    `;
+    chatHistory.appendChild(msgDiv);
+    scrollToBottom();
+}
+
+function addThinkingBubble() {
+    const msgDiv = document.createElement('div');
+    msgDiv.className = 'message ai';
+    msgDiv.innerHTML = `
+        <div class="ai-avatar">🤔</div>
+        <div class="message-content">
+            <div class="thinking-dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+        </div>
+    `;
+    chatHistory.appendChild(msgDiv);
+    scrollToBottom();
+    return msgDiv;
+}
+
+function addSystemMessage(text) {
+    const msgDiv = document.createElement('div');
+    msgDiv.className = 'message ai';
+    msgDiv.innerHTML = `<div class="message-content" style="background: rgba(255, 71, 87, 0.1); color: #ff8fa3;">${text}</div>`;
+    chatHistory.appendChild(msgDiv);
+    scrollToBottom();
+}
+
+// ゴミ判定結果のリッチな表示を作成
+function addAiTrashResult(result) {
+    const town = document.getElementById('townSelect').value;
+    const match = APP_DATA.dictionary.find(d => d.name === result.item_name) || 
+                  APP_DATA.dictionary.find(d => result.item_name.includes(d.name));
+
+    let htmlContent = '';
+
+    if (match) {
+        // 判定成功時
+        htmlContent += `
+            <div>判定結果:</div>
+            <div class="rich-result-name">${match.name}</div>
+            <span class="rich-badge">${match.type}</span>
+        `;
+        
+        // 日付または案内
+        if (town) {
+            const area = APP_DATA.calendar.find(c => c.area === town);
+            let rule = "カレンダー確認";
+            if(area) {
+                if (match.type.includes("燃やす")) rule = area.rules.burn;
+                else if (match.type.includes("燃やさない")) rule = area.rules.nonburn;
+                else rule = area.rules.resource;
+            }
+            htmlContent += `
+                <div class="rich-date-card">
+                    <span class="rich-date-icon">📅</span>
+                    <span class="rich-date-text">次の収集日: ${rule}</span>
+                </div>
+            `;
+        } else {
+            htmlContent += `
+                <div class="rich-suggestion" onclick="highlightTownSelect()">
+                    <span>💡</span> 地域を設定すると収集日も表示されます
+                </div>
+            `;
+        }
+
+        // 注意書き
+        if (match.note) {
+            htmlContent += `<div class="rich-note"><span>⚠️</span> ${match.note}</div>`;
+        }
+
+    } else {
+        // 判定失敗時
+        htmlContent += `
+            画像を解析しましたが、データに見つかりませんでした。<br>
+            検出名: <strong>${result.item_name}</strong><br>
+            <span style="font-size:0.85rem; color:var(--text-sub);">※別の角度で試すか、一般的な名称で登録されていない可能性があります。</span>
+        `;
+    }
+
+    const msgDiv = document.createElement('div');
+    msgDiv.className = 'message ai';
+    msgDiv.innerHTML = `
+        <div class="ai-avatar">🤖</div>
+        <div class="message-content">${htmlContent}</div>
+    `;
+    chatHistory.appendChild(msgDiv);
+    scrollToBottom();
+}
+
+// 地域選択を強調表示（案内クリック時）
+function highlightTownSelect() {
+    const bar = document.querySelector('.settings-bar');
+    bar.style.transition = '0.3s';
+    bar.style.backgroundColor = 'rgba(0, 242, 255, 0.2)';
+    setTimeout(() => { bar.style.backgroundColor = ''; }, 1000);
+    document.getElementById('townSelect').focus();
 }
 </script>
 </body>
